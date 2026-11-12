@@ -29,6 +29,13 @@ coverage/
 .playwright-cli/
 output/
 
+# Local architecture analysis / generated diagrams (archify and friends)
+# 这些是本地分析产物，不进入仓库，也不上传 GitHub。
+.archify/
+archify-output/
+*.archify.html
+*.archify.json
+
 # Deployment tool local state
 .wrangler/
 .vercel/

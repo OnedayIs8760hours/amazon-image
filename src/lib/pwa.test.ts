@@ -6,7 +6,7 @@ describe('isLocalAppHostname', () => {
     expect(isLocalAppHostname(hostname)).toBe(true)
   })
 
-  it.each(['ali-aria.github.io', '192.168.1.20', 'localhost.example.com', ''])('does not classify %s as a loopback host', (hostname) => {
+  it.each(['example.github.io', '192.168.1.20', 'localhost.example.com', ''])('does not classify %s as a loopback host', (hostname) => {
     expect(isLocalAppHostname(hostname)).toBe(false)
   })
 })
