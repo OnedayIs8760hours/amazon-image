@@ -6,7 +6,7 @@
 
 项目仓库：[OnedayIs8760hours/amazon-image](https://github.com/OnedayIs8760hours/amazon-image)
 
-在线体验：[onedayis8760hours.github.io/amazon-image](https://onedayis8760hours.github.io/amazon-image/)
+在线体验：[philister.icu](https://philister.icu/)
 
 ## 开源说明
 
@@ -198,7 +198,7 @@
 
 ## 在线体验
 
-- 在线体验地址由本仓库的 GitHub Pages 提供：<https://onedayis8760hours.github.io/amazon-image/>。也可以按下方“启动项目”本地运行，或自行部署到 GitHub Pages、Cloudflare Pages、Vercel 等静态托管平台。
+- 在线体验地址由本仓库的 GitHub Pages 提供：<https://philister.icu/>。也可以按下方“启动项目”本地运行，或自行部署到 GitHub Pages、Cloudflare Pages、Vercel 等静态托管平台。
 - 打开在线体验不需要 Codex；Codex 只是一种可选的本地安装方式。
 - 在线体验不会内置 API Key；生成图片和 AI 策划都需要在右上角设置中填写你自己的 OpenAI 或兼容接口 Key。
 - “安装为应用”也可以用于本地版，但它不会自动启动本地服务；以后每次启动本地应用前，请先运行项目目录中的 `start-amazon-image-studio.bat`。
@@ -555,7 +555,7 @@ Node.js version: 20
 当前仓库的 GitHub Pages 地址：
 
 ```text
-https://onedayis8760hours.github.io/amazon-image/
+https://philister.icu/
 ```
 
 ### Cloudflare Pages
