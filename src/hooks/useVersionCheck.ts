@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const REPO = 'OnedayIs8760hours/amazon-image-studio'
+const REPO = 'OnedayIs8760hours/amazon-image'
 const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`
 
 function compareVersions(a: string, b: string) {

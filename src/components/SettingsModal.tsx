@@ -2166,7 +2166,7 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
                   > 本站点基于开源项目 [GPT Image Playground](https://github.com/CookSleep/gpt_image_playground) ([MIT](https://github.com/CookSleep/gpt_image_playground/blob/main/LICENSE)) 修改。
                 */}
                 <a
-                  href="https://github.com/OnedayIs8760hours/amazon-image-studio"
+                  href="https://github.com/OnedayIs8760hours/amazon-image"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group flex flex-col items-center outline-none"
@@ -2200,7 +2200,7 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
                     <p>
                       亚马逊图片工作台是免费开源软件，请以本仓库作为来源核验入口。本项目采用{' '}
                       <a
-                        href="https://github.com/OnedayIs8760hours/amazon-image-studio/blob/main/LICENSE"
+                        href="https://github.com/OnedayIs8760hours/amazon-image/blob/main/LICENSE"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-medium text-[hsl(var(--primary))] underline-offset-2 transition hover:underline"
@@ -2218,7 +2218,7 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
                   </div>
                   <div className="mt-4 flex flex-col gap-2 min-[430px]:flex-row">
                     <a
-                      href="https://github.com/OnedayIs8760hours/amazon-image-studio"
+                      href="https://github.com/OnedayIs8760hours/amazon-image"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex min-h-10 flex-1 items-center justify-center whitespace-nowrap rounded-xl bg-[hsl(var(--primary))] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 active:translate-y-px"
@@ -2226,7 +2226,7 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
                       查看项目仓库
                     </a>
                     <a
-                      href="https://github.com/OnedayIs8760hours/amazon-image-studio/issues"
+                      href="https://github.com/OnedayIs8760hours/amazon-image/issues"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex min-h-10 flex-1 items-center justify-center whitespace-nowrap rounded-xl border border-blue-200/80 bg-white/70 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-white active:translate-y-px dark:border-blue-400/20 dark:bg-white/[0.06] dark:text-gray-200 dark:hover:bg-white/[0.1]"
@@ -2257,7 +2257,7 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-3">
                     <a
-                      href="https://github.com/OnedayIs8760hours/amazon-image-studio"
+                      href="https://github.com/OnedayIs8760hours/amazon-image"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-gray-100/80 px-5 py-2.5 text-sm font-medium text-gray-700 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.1] dark:hover:text-white"

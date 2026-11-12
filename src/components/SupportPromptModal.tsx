@@ -62,7 +62,7 @@ export default function SupportPromptModal() {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <a
-            href="https://github.com/OnedayIs8760hours/amazon-image-studio"
+            href="https://github.com/OnedayIs8760hours/amazon-image"
             target="_blank"
             rel="noopener noreferrer"
             onClick={dismissSupportPrompt}
@@ -74,7 +74,7 @@ export default function SupportPromptModal() {
             项目主页
           </a>
           <a
-            href="https://github.com/OnedayIs8760hours/amazon-image-studio/issues"
+            href="https://github.com/OnedayIs8760hours/amazon-image/issues"
             target="_blank"
             rel="noopener noreferrer"
             onClick={dismissSupportPrompt}
