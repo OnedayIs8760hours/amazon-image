@@ -541,7 +541,7 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
 
   useEffect(() => {
     if (!showSettings || !settingsTabRequest) return
-    setActiveTab(settingsTabRequest === 'agent' ? 'api' : settingsTabRequest)
+    setActiveTab(settingsTabRequest === 'agent' || settingsTabRequest === 'about' ? 'api' : settingsTabRequest)
   }, [settingsTabRequest, showSettings])
 
   useEffect(() => () => {
@@ -1223,7 +1223,7 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
         <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
           {/* Sidebar */}
           <div className="flex w-full shrink-0 flex-col border-b border-gray-100 bg-gray-50/50 dark:border-white/[0.08] dark:bg-white/[0.02] sm:w-48 sm:border-b-0 sm:border-r">
-            <nav className="grid grid-cols-4 gap-1 p-2 sm:flex sm:flex-1 sm:flex-col sm:space-y-1 sm:overflow-y-auto sm:p-3">
+            <nav className="grid grid-cols-3 gap-1 p-2 sm:flex sm:flex-1 sm:flex-col sm:space-y-1 sm:overflow-y-auto sm:p-3">
               <button
                 onClick={() => setActiveTab('api')}
                 className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1 py-2.5 text-[11px] transition-colors min-[430px]:text-xs sm:flex-shrink-0 sm:justify-start sm:gap-2.5 sm:px-3 sm:text-sm ${activeTab === 'api' ? 'bg-white font-medium text-blue-600 shadow-sm dark:bg-white/[0.08] dark:text-blue-400' : 'text-gray-600 hover:bg-gray-100/80 dark:text-gray-400 dark:hover:bg-white/[0.04]'}`}
@@ -1250,15 +1250,6 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                 </svg>
                 数据管理
-              </button>
-              <button
-                onClick={() => setActiveTab('about')}
-                className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1 py-2.5 text-[11px] transition-colors min-[430px]:text-xs sm:flex-shrink-0 sm:justify-start sm:gap-2.5 sm:px-3 sm:text-sm ${activeTab === 'about' ? 'bg-white font-medium text-blue-600 shadow-sm dark:bg-white/[0.08] dark:text-blue-400' : 'text-gray-600 hover:bg-gray-100/80 dark:text-gray-400 dark:hover:bg-white/[0.04]'}`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                关于
               </button>
             </nav>
           </div>
@@ -2133,7 +2124,7 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
               </div>
             )}
 
-            {activeTab === 'about' && (
+            {false && activeTab === 'about' && (
               <div className="flex h-full min-h-[300px] flex-col">
                 <div className="-mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain custom-scrollbar px-5 sm:-mx-6 sm:px-6">
                   <div className="flex flex-col items-center px-1 pt-2 sm:px-4 sm:pt-4">
