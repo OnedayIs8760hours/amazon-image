@@ -148,13 +148,6 @@ export default function Header({ activeView, onNavigate }: HeaderProps) {
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setShowSettings(true, 'about')}
-              className="h-8 whitespace-nowrap rounded-[10px] px-2 text-[11px] font-semibold text-[hsl(var(--primary))] transition hover:bg-[hsl(var(--ios-blue-tint))] active:translate-y-px sm:px-2.5 sm:text-xs"
-            >
-              开源声明
-            </button>
             {!isPwaInstalled && (
               <div
                 className="relative"

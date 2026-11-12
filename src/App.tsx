@@ -17,6 +17,7 @@ import ConfirmDialog from './components/ConfirmDialog'
 import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
+import LoginPage, { hasDemoLoginSession } from './components/LoginPage'
 import { useGlobalClickSuppression } from './lib/clickSuppression'
 
 export type AppView = 'home' | 'editor' | 'tagger'
@@ -29,6 +30,7 @@ function getAppViewFromHash(): AppView {
 }
 
 export default function App() {
+  const [authenticated, setAuthenticated] = useState(hasDemoLoginSession)
   const setSettings = useStore((s) => s.setSettings)
   const [view, setView] = useState<AppView>(getAppViewFromHash)
   useDockerApiUrlMigrationNotice()
@@ -78,6 +80,10 @@ export default function App() {
     document.addEventListener('dragstart', preventPageImageDrag)
     return () => document.removeEventListener('dragstart', preventPageImageDrag)
   }, [])
+
+  if (!authenticated) {
+    return <LoginPage onAuthenticated={() => setAuthenticated(true)} />
+  }
 
   const navigate = (nextView: AppView) => {
     setView(nextView)
