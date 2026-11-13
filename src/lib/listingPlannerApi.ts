@@ -1,4 +1,4 @@
-import type { ApiProfile } from '../types'
+import type { ApiProfile, PlannerDebugPlanDigest } from '../types'
 import { DEFAULT_CHAT_MODEL, DEFAULT_RESPONSES_MODEL, isOfficialDeepSeekPlannerProfile } from './apiProfiles'
 import { formatAmazonAPlusReferenceMaterial, formatAmazonListingReferenceMaterial } from './amazonKnowledge'
 import {
@@ -8,6 +8,13 @@ import {
 } from './amazonMarketplaces'
 import { buildApiUrl, readClientDevProxyConfig, shouldUseApiProxy } from './devProxy'
 import { getApiErrorMessage } from './imageApiShared'
+import {
+  createPlannerTraceId,
+  endPlannerSpan,
+  nowMs,
+  recordPlannerDebug,
+  startPlannerSpan,
+} from './observability'
 import type { AmazonPromptDraft } from './amazonPrompt'
 import {
   DEFAULT_LISTING_IMAGE_COUNT,
@@ -730,6 +737,31 @@ function buildChatPlannerSystemPrompt(
   ].join('\n\n')
 }
 
+function roundMs(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+function isPlannerAbortError(error: unknown): boolean {
+  return Boolean(error) && typeof error === 'object' && (error as { name?: string }).name === 'AbortError'
+}
+
+function toPlannerDebugPlanDigests(result: PlannerApiResult): PlannerDebugPlanDigest[] {
+  if (result.mode === 'aplus') {
+    return result.aPlusPlans.map((plan) => ({
+      slot: plan.slot,
+      label: plan.label,
+      prompt: plan.prompt,
+      negativePrompt: plan.negativePrompt,
+    }))
+  }
+  return result.plans.map((plan) => ({
+    slot: plan.slot,
+    label: plan.label,
+    prompt: plan.prompt,
+    negativePrompt: plan.negativePrompt,
+  }))
+}
+
 export async function callAmazonPlannerApi(options: {
   listingText: string
   baseDraft: AmazonPromptDraft
@@ -742,8 +774,15 @@ export async function callAmazonPlannerApi(options: {
   aPlusType?: APlusContentType
   aPlusModuleSpecs?: Array<Partial<AmazonAPlusModuleSpec>>
   aPlusGenerationTier?: SizeTier
+  /** 调用方点击「AI 策划」的时间戳（nowMs），用于把参考图压缩等前置阶段计入 planner_debug 耗时。 */
+  requestStartedAt?: number
   signal?: AbortSignal
 }): Promise<PlannerApiResult> {
+  const traceId = createPlannerTraceId()
+  const callStartedAt = nowMs()
+  const prepareMs = options.requestStartedAt != null
+    ? Math.max(0, callStartedAt - options.requestStartedAt)
+    : undefined
   const model = options.model?.trim() || options.profile.model.trim() || (options.profile.apiMode === 'chat' ? DEFAULT_CHAT_MODEL : DEFAULT_RESPONSES_MODEL)
   const mode = options.mode ?? 'listing'
   const marketplaceId = normalizeAmazonMarketplaceId(options.marketplaceId)
@@ -756,40 +795,68 @@ export async function callAmazonPlannerApi(options: {
   const useApiProxy = shouldUseApiProxy(options.profile.apiProxy, proxyConfig, options.profile.baseUrl)
   const useChatCompletions = options.profile.apiMode === 'chat'
   const isDeepSeekPlannerProfile = isOfficialDeepSeekPlannerProfile(options.profile)
-  const inputText = buildPlannerInputText(options.listingText, mode, aPlusType, {
-    includeReferenceImageInstruction: !isDeepSeekPlannerProfile,
-    userProductFacts: isDeepSeekPlannerProfile ? buildUserProductFactsText(options.baseDraft) : '',
-    listingImageCount,
-    aPlusModuleSpecs,
-    marketplaceId,
-  })
   const referenceImageDataUrls = isDeepSeekPlannerProfile
     ? []
     : options.referenceImageDataUrls ?? []
-  const response = await fetch(
-    useChatCompletions
-      ? buildApiUrl(options.profile.baseUrl, 'chat/completions', proxyConfig, useApiProxy, { prefixV1: false })
-      : buildApiUrl(options.profile.baseUrl, 'responses', proxyConfig, useApiProxy),
-    {
-    method: 'POST',
-    signal: options.signal,
-    headers: {
-      Authorization: `Bearer ${options.profile.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
-    body: JSON.stringify(useChatCompletions
+
+  const timings = {
+    ...(prepareMs != null ? { prepareMs: roundMs(prepareMs) } : {}),
+    buildRequestMs: 0,
+    networkMs: 0,
+    readResponseMs: 0,
+    parseJsonMs: 0,
+    normalizeMs: 0,
+    totalMs: 0,
+  }
+  let systemPrompt = ''
+  let requestBody: unknown = null
+  let requestBodyText = ''
+  let responseText = ''
+  let rawOutputText = ''
+  let rawResponsePromise: Promise<string> | undefined
+  let rawJson: unknown = null
+  let httpStatus: number | undefined
+  let errorMessage: string | undefined
+  let status: 'success' | 'error' | 'aborted' = 'success'
+  let plans: PlannerDebugPlanDigest[] = []
+  let rootSpan: ReturnType<typeof startPlannerSpan> = startPlannerSpan('planner.request', traceId, {
+    'planner.mode': mode,
+    'planner.marketplace_id': marketplaceId,
+    'planner.model': model,
+    'planner.api_mode': options.profile.apiMode,
+    'planner.listing_image_count': listingImageCount,
+    'planner.reference_image_count': referenceImageDataUrls.length,
+  })
+
+  try {
+    const buildStartedAt = nowMs()
+    const inputText = buildPlannerInputText(options.listingText, mode, aPlusType, {
+      includeReferenceImageInstruction: !isDeepSeekPlannerProfile,
+      userProductFacts: isDeepSeekPlannerProfile ? buildUserProductFactsText(options.baseDraft) : '',
+      listingImageCount,
+      aPlusModuleSpecs,
+      marketplaceId,
+    })
+    systemPrompt = useChatCompletions
+      ? buildChatPlannerSystemPrompt(options.baseDraft, mode, aPlusType, {
+          textOnlyReferenceGuard: isDeepSeekPlannerProfile,
+          listingImageCount,
+          aPlusModuleSpecs,
+          marketplaceId,
+        })
+      : buildPlannerInstructions(options.baseDraft, mode, aPlusType, {
+          textOnlyReferenceGuard: isDeepSeekPlannerProfile,
+          listingImageCount,
+          aPlusModuleSpecs,
+          marketplaceId,
+        })
+    requestBody = useChatCompletions
       ? {
           model,
           messages: [
             {
               role: 'system',
-              content: buildChatPlannerSystemPrompt(options.baseDraft, mode, aPlusType, {
-                textOnlyReferenceGuard: isDeepSeekPlannerProfile,
-                listingImageCount,
-                aPlusModuleSpecs,
-                marketplaceId,
-              }),
+              content: systemPrompt,
             },
             {
               role: 'user',
@@ -801,12 +868,7 @@ export async function callAmazonPlannerApi(options: {
         }
       : {
           model,
-          instructions: buildPlannerInstructions(options.baseDraft, mode, aPlusType, {
-            textOnlyReferenceGuard: isDeepSeekPlannerProfile,
-            listingImageCount,
-            aPlusModuleSpecs,
-            marketplaceId,
-          }),
+          instructions: systemPrompt,
           input: buildResponsesPlannerInput(inputText, referenceImageDataUrls),
           text: {
             format: {
@@ -817,18 +879,133 @@ export async function callAmazonPlannerApi(options: {
             },
           },
           stream: false,
-        },
-    ),
-    },
-  )
+        }
+    requestBodyText = JSON.stringify(requestBody)
+    timings.buildRequestMs = roundMs(nowMs() - buildStartedAt)
 
-  if (!response.ok) {
-    const message = await getApiErrorMessage(response)
-    throw new Error(`HTTP ${response.status}: ${message}`)
+    const url = useChatCompletions
+      ? buildApiUrl(options.profile.baseUrl, 'chat/completions', proxyConfig, useApiProxy, { prefixV1: false })
+      : buildApiUrl(options.profile.baseUrl, 'responses', proxyConfig, useApiProxy)
+    const networkStartedAt = nowMs()
+    const networkSpan = startPlannerSpan('planner.network', traceId, {
+      'http.request.method': 'POST',
+      'url.full': url,
+      'http.request.body.size': requestBodyText.length,
+    })
+    let networkError: unknown
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        signal: options.signal,
+        headers: {
+          Authorization: `Bearer ${options.profile.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+        body: requestBodyText,
+      })
+    } catch (error) {
+      networkError = error
+      throw error
+    } finally {
+      timings.networkMs = roundMs(nowMs() - networkStartedAt)
+      endPlannerSpan(networkSpan, networkError)
+    }
+
+    httpStatus = response.status
+    try {
+      rawResponsePromise = response.clone().text().catch(() => '')
+    } catch {
+      rawResponsePromise = undefined
+    }
+
+    if (!response.ok) {
+      const message = await getApiErrorMessage(response)
+      throw new Error(`HTTP ${response.status}: ${message}`)
+    }
+
+    const readStartedAt = nowMs()
+    const readSpan = startPlannerSpan('planner.read_response', traceId, {
+      'http.response.status_code': response.status,
+      'planner.response.is_event_stream': isEventStreamResponse(response),
+    })
+    let readError: unknown
+    let text: string
+    try {
+      text = await readPlannerResponseText(response)
+      rawOutputText = text
+    } catch (error) {
+      readError = error
+      throw error
+    } finally {
+      timings.readResponseMs = roundMs(nowMs() - readStartedAt)
+      endPlannerSpan(readSpan, readError)
+    }
+
+    const parseStartedAt = nowMs()
+    const parseSpan = startPlannerSpan('planner.parse_json', traceId, {
+      'planner.response.text_length': text.length,
+    })
+    let payload: PlannerApiPayload
+    let parseError: unknown
+    try {
+      payload = parsePlannerPayload(text)
+      rawJson = payload
+    } catch (error) {
+      parseError = error
+      throw error
+    } finally {
+      timings.parseJsonMs = roundMs(nowMs() - parseStartedAt)
+      endPlannerSpan(parseSpan, parseError)
+    }
+
+    const normalizeStartedAt = nowMs()
+    const normalizeSpan = startPlannerSpan('planner.normalize', traceId)
+    let normalizeError: unknown
+    try {
+      const result = mode === 'aplus'
+        ? normalizeAPlusPlannerApiPayload(payload, aPlusType, aPlusGenerationTier, aPlusModuleSpecs, marketplaceId)
+        : normalizeListingPlannerApiPayload(payload, listingImageCount, marketplaceId)
+      plans = toPlannerDebugPlanDigests(result)
+      normalizeSpan?.setAttribute('planner.plan_count', plans.length)
+      return result
+    } catch (error) {
+      normalizeError = error
+      throw error
+    } finally {
+      timings.normalizeMs = roundMs(nowMs() - normalizeStartedAt)
+      endPlannerSpan(normalizeSpan, normalizeError)
+    }
+  } catch (error) {
+    status = options.signal?.aborted || isPlannerAbortError(error) ? 'aborted' : 'error'
+    errorMessage = error instanceof Error ? error.message : String(error)
+    throw error
+  } finally {
+    if (rawResponsePromise) {
+      responseText = await rawResponsePromise
+    }
+    timings.totalMs = roundMs(nowMs() - callStartedAt)
+    endPlannerSpan(rootSpan, status === 'success' ? undefined : new Error(errorMessage ?? 'planner request failed'))
+    await recordPlannerDebug({
+      traceId,
+      status,
+      mode,
+      marketplaceId,
+      model,
+      apiMode: options.profile.apiMode,
+      baseUrl: options.profile.baseUrl,
+      ...(httpStatus != null ? { httpStatus } : {}),
+      rawListing: options.listingText,
+      systemPrompt,
+      requestBody,
+      responseText,
+      rawOutputText,
+      rawJson,
+      plans,
+      timings,
+      referenceImageCount: referenceImageDataUrls.length,
+      ...(errorMessage ? { error: errorMessage } : {}),
+    })
   }
-  const text = await readPlannerResponseText(response)
-  const payload = parsePlannerPayload(text)
-  return mode === 'aplus'
-    ? normalizeAPlusPlannerApiPayload(payload, aPlusType, aPlusGenerationTier, aPlusModuleSpecs, marketplaceId)
-    : normalizeListingPlannerApiPayload(payload, listingImageCount, marketplaceId)
 }

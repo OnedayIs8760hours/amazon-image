@@ -403,6 +403,81 @@ export interface AmazonPlannerSession {
   updatedAt: number
 }
 
+// ===== AI 请求调试（planner_debug） =====
+
+/**
+ * 每次 AI 策划请求保存一条 planner_debug 记录：
+ * 原始 listing、系统提示、请求/响应体、模型原始 JSON 与各阶段耗时。
+ * 仅保存在浏览器 IndexedDB，用于回归时对比提示词/模型改动。
+ */
+export interface PlannerDebugTimings {
+  /** 从点击「AI 策划」到开始组装请求（参考图压缩等前置阶段） */
+  prepareMs?: number
+  buildRequestMs: number
+  networkMs: number
+  readResponseMs: number
+  parseJsonMs: number
+  normalizeMs: number
+  totalMs: number
+}
+
+export interface PlannerDebugPlanDigest {
+  slot: string
+  label: string
+  prompt: string
+  negativePrompt: string
+}
+
+export interface PlannerDebugRecord {
+  id: string
+  kind: 'planner_debug'
+  createdAt: number
+  /** 同一次策划请求的关联 id，用于关联 planner_span / 阶段追踪 */
+  traceId: string
+  status: 'success' | 'error' | 'aborted'
+  mode: 'listing' | 'aplus'
+  marketplaceId: string
+  model: string
+  apiMode: ApiMode
+  baseUrl: string
+  httpStatus?: number
+  /** 用户粘贴的原始 listing 文本（未裁剪） */
+  rawListing: string
+  /** 实际发送给模型的系统提示（Responses API 为 instructions） */
+  systemPrompt: string
+  /** 实际发送的请求体（图片 data URL 已摘要化，避免占满存储） */
+  requestBody: unknown
+  /** 模型原始响应文本（SSE 响应为原始事件流文本） */
+  responseText: string
+  /** 从响应中提取的模型输出文本（JSON.parse 之前，可能包含 ```json 围栏） */
+  rawOutputText: string
+  /** 模型返回的 JSON 对象（规范化之前的原始结构） */
+  rawJson: unknown
+  /** 规范化后的各槽位提示词摘要，便于直接对比 PT03 这类槽位 */
+  plans: PlannerDebugPlanDigest[]
+  timings: PlannerDebugTimings
+  referenceImageCount: number
+  error?: string
+  appVersion: string
+}
+
+export interface PlannerSpanRecord {
+  id: string
+  kind: 'planner_span'
+  createdAt: number
+  traceId: string
+  spanId: string
+  otelTraceId?: string
+  parentSpanId?: string
+  name: string
+  durationMs: number
+  statusCode: number
+  statusMessage?: string
+  attributes: Record<string, string | number | boolean>
+}
+
+export type DebugRecord = PlannerDebugRecord | PlannerSpanRecord
+
 // ===== Agent 模式 =====
 
 export type AgentMessageRole = 'user' | 'assistant'

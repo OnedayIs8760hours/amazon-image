@@ -1,11 +1,22 @@
-import type { AmazonPlannerSession, TaskRecord, StoredImage, StoredImageThumbnail } from '../types'
+import type {
+  AmazonPlannerSession,
+  DebugRecord,
+  PlannerDebugRecord,
+  PlannerSpanRecord,
+  TaskRecord,
+  StoredImage,
+  StoredImageThumbnail,
+} from '../types'
 
 const DB_NAME = 'amazon-image-studio'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const STORE_TASKS = 'tasks'
 const STORE_IMAGES = 'images'
 const STORE_THUMBNAILS = 'thumbnails'
 const STORE_AMAZON_PLANNER_SESSIONS = 'amazonPlannerSessions'
+const STORE_DEBUG_RECORDS = 'debugRecords'
+const DEBUG_KIND_CREATED_AT_INDEX = 'kindCreatedAt'
+const DEBUG_TRACE_ID_INDEX = 'traceId'
 const THUMBNAIL_MAX_SIZE = 720
 const THUMBNAIL_QUALITY = 0.9
 const THUMBNAIL_VERSION = 2
@@ -28,6 +39,11 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_AMAZON_PLANNER_SESSIONS)) {
         db.createObjectStore(STORE_AMAZON_PLANNER_SESSIONS, { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains(STORE_DEBUG_RECORDS)) {
+        const store = db.createObjectStore(STORE_DEBUG_RECORDS, { keyPath: 'id' })
+        store.createIndex(DEBUG_KIND_CREATED_AT_INDEX, ['kind', 'createdAt'])
+        store.createIndex(DEBUG_TRACE_ID_INDEX, 'traceId')
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -86,6 +102,85 @@ export function deleteAmazonPlannerSession(id: string): Promise<undefined> {
 
 export function clearAmazonPlannerSessions(): Promise<undefined> {
   return dbTransaction(STORE_AMAZON_PLANNER_SESSIONS, 'readwrite', (s) => s.clear())
+}
+
+// ===== AI 请求调试记录（planner_debug） =====
+
+export function putDebugRecord(record: DebugRecord): Promise<IDBValidKey> {
+  return dbTransaction(STORE_DEBUG_RECORDS, 'readwrite', (s) => s.put(record))
+}
+
+export function getPlannerDebugRecords(limit = 50): Promise<PlannerDebugRecord[]> {
+  const safeLimit = Math.max(1, Math.trunc(limit))
+  return openDB().then(
+    (db) =>
+      new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_DEBUG_RECORDS, 'readonly')
+        const index = tx.objectStore(STORE_DEBUG_RECORDS).index(DEBUG_KIND_CREATED_AT_INDEX)
+        const range = IDBKeyRange.bound(['planner_debug', 0], ['planner_debug', Number.MAX_SAFE_INTEGER])
+        const request = index.openCursor(range, 'prev')
+        const records: PlannerDebugRecord[] = []
+        request.onsuccess = () => {
+          const cursor = request.result
+          if (!cursor || records.length >= safeLimit) {
+            resolve(records)
+            return
+          }
+          records.push(cursor.value as PlannerDebugRecord)
+          cursor.continue()
+        }
+        request.onerror = () => reject(request.error)
+      }),
+  )
+}
+
+export function getDebugSpansForTrace(traceId: string): Promise<PlannerSpanRecord[]> {
+  if (!traceId) return Promise.resolve([])
+  return dbTransaction(STORE_DEBUG_RECORDS, 'readonly', (s) => s.index(DEBUG_TRACE_ID_INDEX).getAll(traceId))
+    .then((records) => (records as DebugRecord[])
+      .filter((record): record is PlannerSpanRecord => record.kind === 'planner_span')
+      .sort((left, right) => (left.createdAt - left.durationMs) - (right.createdAt - right.durationMs)))
+}
+
+export function getAllDebugRecords(): Promise<DebugRecord[]> {
+  return dbTransaction(STORE_DEBUG_RECORDS, 'readonly', (s) => s.getAll())
+}
+
+export function deleteDebugRecord(id: string): Promise<undefined> {
+  return dbTransaction(STORE_DEBUG_RECORDS, 'readwrite', (s) => s.delete(id))
+}
+
+export function clearDebugRecords(): Promise<undefined> {
+  return dbTransaction(STORE_DEBUG_RECORDS, 'readwrite', (s) => s.clear())
+}
+
+/**
+ * 只保留某类调试记录最新的 keep 条。使用 index key cursor 从新到旧遍历，
+ * 不读取大字段（planner_debug 的请求/响应体）本身，避免清理时占用过多内存。
+ */
+export function pruneDebugRecords(kind: DebugRecord['kind'], keep: number): Promise<void> {
+  const safeKeep = Math.max(0, Math.trunc(keep))
+  return openDB().then(
+    (db) =>
+      new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_DEBUG_RECORDS, 'readwrite')
+        const store = tx.objectStore(STORE_DEBUG_RECORDS)
+        const index = store.index(DEBUG_KIND_CREATED_AT_INDEX)
+        const range = IDBKeyRange.bound([kind, 0], [kind, Number.MAX_SAFE_INTEGER])
+        const request = index.openKeyCursor(range, 'prev')
+        let seen = 0
+        request.onsuccess = () => {
+          const cursor = request.result
+          if (!cursor) return
+          seen += 1
+          if (seen > safeKeep) store.delete(cursor.primaryKey)
+          cursor.continue()
+        }
+        request.onerror = () => reject(request.error)
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+      }),
+  )
 }
 
 // ===== Images =====

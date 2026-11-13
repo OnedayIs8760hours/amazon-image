@@ -45,6 +45,7 @@ import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
 import Select from './Select'
 import { Sheet, useSheetDrag } from './Sheet'
 import { Checkbox } from './Checkbox'
+import PlannerDebugPanel from './PlannerDebugPanel'
 import ViewportTooltip from './ViewportTooltip'
 import { ChevronDownIcon, CloseIcon, CopyIcon, EditIcon, PlusIcon, TrashIcon, ExportIcon, ImportIcon, LinkIcon, PhotoIcon } from './icons'
 
@@ -55,7 +56,6 @@ const ADD_CUSTOM_PROVIDER_VALUE = '__add_custom_provider__'
 const COPY_IMPORT_URL_OPTIONS_STORAGE_KEY = 'gpt-image-playground.copy-import-url-options'
 const LEGACY_DEFAULT_CHAT_MODEL = 'deepseek-v4-flash'
 const DEEPSEEK_PLANNER_NOTICE = '当前 AI 策划配置为 DeepSeek 官方接口。DeepSeek 策划阶段不会读取参考图，系统会仅用 Listing 文本和你填写的商品信息生成策划；参考图仍会在正式生图时随生图请求发送。请把产品颜色、形状、结构、配件、Logo、套装数量等关键特征写进 Listing 或商品信息中。'
-const WECHAT_OFFICIAL_ACCOUNT_NAME = '阿梨Aria早鸟报'
 
 const DEFAULT_COPY_IMPORT_URL_OPTIONS = {
   includeApiKey: false,
@@ -684,15 +684,6 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
     }
   }
 
-  const copyWechatOfficialAccountName = async () => {
-    try {
-      await copyTextToClipboard(WECHAT_OFFICIAL_ACCOUNT_NAME)
-      showToast('公众号名称已复制', 'success')
-    } catch (err) {
-      showToast(getClipboardFailureMessage('复制公众号名称失败', err), 'error')
-    }
-  }
-
   const confirmCopyProfileImportUrl = (profile: ApiProfile) => {
     setCopyImportUrlProfile(profile)
     setCopyImportUrlOptions(readCopyImportUrlOptions())
@@ -1185,7 +1176,6 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
             设置
           </h3>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-400 dark:text-gray-500 font-mono select-none">v{__APP_VERSION__}</span>
             <button
               onClick={handleClose}
               className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
@@ -1196,34 +1186,10 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
           </div>
         </div>
 
-        <div
-          className="flex shrink-0 items-start gap-2.5 border-b border-[hsl(var(--separator))] bg-[hsl(var(--ios-blue-tint))] px-4 py-3 text-xs leading-5 text-gray-600 dark:text-gray-300 sm:px-5"
-          role="note"
-        >
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--primary))] text-white">
-            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M12 16v-4m0-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </span>
-          <span>
-            不会配置？微信搜索公众号
-            <button
-              type="button"
-              onClick={() => void copyWechatOfficialAccountName()}
-              className="mx-1 rounded-sm font-semibold text-[hsl(var(--primary))] underline decoration-transparent underline-offset-2 transition hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--primary))] focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--ios-blue-tint))]"
-              aria-label={`复制公众号名称：${WECHAT_OFFICIAL_ACCOUNT_NAME}`}
-              title="点击复制公众号名称"
-            >
-              {WECHAT_OFFICIAL_ACCOUNT_NAME}
-            </button>
-            查看配置教程。
-          </span>
-        </div>
-
         <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
           {/* Sidebar */}
           <div className="flex w-full shrink-0 flex-col border-b border-gray-100 bg-gray-50/50 dark:border-white/[0.08] dark:bg-white/[0.02] sm:w-48 sm:border-b-0 sm:border-r">
-            <nav className="grid grid-cols-3 gap-1 p-2 sm:flex sm:flex-1 sm:flex-col sm:space-y-1 sm:overflow-y-auto sm:p-3">
+            <nav className="grid grid-cols-4 gap-1 p-2 sm:flex sm:flex-1 sm:flex-col sm:space-y-1 sm:overflow-y-auto sm:p-3">
               <button
                 onClick={() => setActiveTab('api')}
                 className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1 py-2.5 text-[11px] transition-colors min-[430px]:text-xs sm:flex-shrink-0 sm:justify-start sm:gap-2.5 sm:px-3 sm:text-sm ${activeTab === 'api' ? 'bg-white font-medium text-blue-600 shadow-sm dark:bg-white/[0.08] dark:text-blue-400' : 'text-gray-600 hover:bg-gray-100/80 dark:text-gray-400 dark:hover:bg-white/[0.04]'}`}
@@ -1250,6 +1216,15 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                 </svg>
                 数据管理
+              </button>
+              <button
+                onClick={() => setActiveTab('debug')}
+                className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1 py-2.5 text-[11px] transition-colors min-[430px]:text-xs sm:flex-shrink-0 sm:justify-start sm:gap-2.5 sm:px-3 sm:text-sm ${activeTab === 'debug' ? 'bg-white font-medium text-blue-600 shadow-sm dark:bg-white/[0.08] dark:text-blue-400' : 'text-gray-600 hover:bg-gray-100/80 dark:text-gray-400 dark:hover:bg-white/[0.04]'}`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h7m6-8l3 3-3 3" />
+                </svg>
+                调试日志
               </button>
             </nav>
           </div>
@@ -2122,6 +2097,10 @@ export default function SettingsModal({ scope = 'home' }: SettingsModalProps) {
                   </button>
                 </div>
               </div>
+            )}
+
+            {activeTab === 'debug' && (
+              <PlannerDebugPanel />
             )}
 
             {false && activeTab === 'about' && (

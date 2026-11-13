@@ -1,17 +1,8 @@
-import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { useTooltip } from '../hooks/useTooltip'
-import { dismissAllTooltips } from '../lib/tooltipDismiss'
 import ViewportTooltip from './ViewportTooltip'
-import HelpModal from './HelpModal'
-import { HelpCircleIcon, InstallIcon, SettingsIcon } from './icons'
+import { SettingsIcon } from './icons'
 import { Button } from './Button'
-import { isLocalAppHostname } from '../lib/pwa'
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
-}
 
 type AppView = 'home' | 'editor' | 'tagger'
 
@@ -20,94 +11,9 @@ type HeaderProps = {
   onNavigate: (view: AppView) => void
 }
 
-const LOCAL_INSTALL_REMINDER = '这是本地版。安装后，下次启动应用前仍需要先打开项目目录中的 start-amazon-image-studio.bat，保持本地服务运行；否则应用无法使用。'
-
-function isInstalledPwa() {
-  const nav = window.navigator as Navigator & { standalone?: boolean }
-  return window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true
-}
-
 export default function Header({ activeView, onNavigate }: HeaderProps) {
   const setShowSettings = useStore((s) => s.setShowSettings)
-  const setConfirmDialog = useStore((s) => s.setConfirmDialog)
-  const [showHelp, setShowHelp] = useState(false)
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [isPwaInstalled, setIsPwaInstalled] = useState(isInstalledPwa)
-  const isLocalApp = isLocalAppHostname(window.location.hostname)
-
-  const installTooltip = useTooltip()
-  const helpTooltip = useTooltip()
   const settingsTooltip = useTooltip()
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault()
-      setInstallPrompt(event as BeforeInstallPromptEvent)
-      setIsPwaInstalled(false)
-    }
-
-    const handleAppInstalled = () => {
-      setInstallPrompt(null)
-      setIsPwaInstalled(true)
-    }
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    window.addEventListener('appinstalled', handleAppInstalled)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-      window.removeEventListener('appinstalled', handleAppInstalled)
-    }
-  }, [])
-
-  const promptInstall = async (promptEvent: BeforeInstallPromptEvent) => {
-    setInstallPrompt(null)
-
-    try {
-      await promptEvent.prompt()
-      const choice = await promptEvent.userChoice
-      setIsPwaInstalled(choice.outcome === 'accepted')
-    } catch {
-      setIsPwaInstalled(isInstalledPwa())
-    }
-  }
-
-  const handleInstallClick = () => {
-    if (installPrompt) {
-      const promptEvent = installPrompt
-
-      if (isLocalApp) {
-        setConfirmDialog({
-          title: '安装为应用',
-          message: LOCAL_INSTALL_REMINDER,
-          showCancel: true,
-          confirmText: '继续安装',
-          cancelText: '取消',
-          icon: 'info',
-          action: () => {
-            void promptInstall(promptEvent)
-          },
-        })
-      } else {
-        void promptInstall(promptEvent)
-      }
-      return
-    }
-
-    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-    const installInstructions = isIos
-      ? '在 Safari 浏览器中，点击底部「分享」按钮，选择「添加到主屏幕」即可安装此应用。'
-      : '请在浏览器的菜单中选择「添加到主屏幕」或「安装应用」。\n\n（如果在微信等内置浏览器中，请先在外部浏览器打开）'
-
-    setConfirmDialog({
-      title: isLocalApp ? '安装本地应用' : '安装为应用',
-      message: isLocalApp ? `${LOCAL_INSTALL_REMINDER}\n\n${installInstructions}` : installInstructions,
-      showCancel: false,
-      confirmText: '我知道了',
-      icon: 'info',
-      action: () => {},
-    })
-  }
 
   return (
     <>
@@ -148,48 +54,6 @@ export default function Header({ activeView, onNavigate }: HeaderProps) {
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {!isPwaInstalled && (
-              <div
-                className="relative"
-                {...installTooltip.handlers}
-              >
-                <Button
-                  onClick={() => {
-                    dismissAllTooltips()
-                    handleInstallClick()
-                  }}
-                  variant="plain"
-                  size="icon"
-                  className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-                  aria-label="安装为应用"
-                >
-                  <InstallIcon className="h-5 w-5" />
-                </Button>
-                <ViewportTooltip visible={installTooltip.visible} className="whitespace-nowrap">
-                  安装为应用
-                </ViewportTooltip>
-              </div>
-            )}
-            <div
-              className="relative"
-              {...helpTooltip.handlers}
-            >
-              <Button
-                onClick={() => {
-                  dismissAllTooltips()
-                  setShowHelp(true)
-                }}
-                variant="plain"
-                size="icon"
-                className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-                aria-label="操作指南"
-              >
-                <HelpCircleIcon className="h-5 w-5" />
-              </Button>
-              <ViewportTooltip visible={helpTooltip.visible} className="whitespace-nowrap">
-                操作指南
-              </ViewportTooltip>
-            </div>
             <div
               className="relative"
               {...settingsTooltip.handlers}
@@ -214,7 +78,6 @@ export default function Header({ activeView, onNavigate }: HeaderProps) {
       <div className="safe-area-top invisible pointer-events-none" aria-hidden="true">
         <div className="safe-header-inner" />
       </div>
-      {showHelp && <HelpModal appMode="gallery" onClose={() => setShowHelp(false)} />}
     </>
   )
 }

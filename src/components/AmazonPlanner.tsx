@@ -38,6 +38,7 @@ import {
   type AmazonStyleDensityMode,
 } from '../lib/listingPlanner'
 import { callAmazonPlannerApi, type PlannerApiResult } from '../lib/listingPlannerApi'
+import { nowMs } from '../lib/observability'
 import { deleteAmazonPlannerSession, getAllAmazonPlannerSessions, putAmazonPlannerSession } from '../lib/db'
 import {
   AMAZON_MARKETPLACES,
@@ -1463,6 +1464,7 @@ export default function AmazonPlanner() {
     setPlannerError('')
     try {
       const currentMarketplaceId = marketplaceId
+      const requestStartedAt = nowMs()
       const referencePayload = await prepareReferencePayloadForRequest(inputImages.map((image) => image.dataUrl), controller.signal)
       const result = await callAmazonPlannerApi({
         listingText,
@@ -1475,6 +1477,7 @@ export default function AmazonPlanner() {
         aPlusType,
         aPlusModuleSpecs: aPlusSpecs,
         aPlusGenerationTier: resolutionTier,
+        requestStartedAt,
         signal: controller.signal,
       })
       if (controller.signal.aborted) return
